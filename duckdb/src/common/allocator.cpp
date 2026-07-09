@@ -19,6 +19,7 @@
 #endif
 
 #include "remon.h"
+#include <cstring>
 #include <mutex>
 #define REMON_MALLOC 1
 

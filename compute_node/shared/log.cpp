@@ -32,9 +32,12 @@ void log::debug(std::ostream &ss) {
 }
 
 void log::shared(std::ostream &ss, const std::string& type) {
+    return;
+    /*
     if(!fileName.empty()) {
         return sharedf(ss, type);
     }
+    */
 
     std::stringstream builder;
     if(prefix.size() < 64) {
@@ -44,6 +47,11 @@ void log::shared(std::ostream &ss, const std::string& type) {
     }
     lock.lock();
     std::cout << builder.str() << std::endl;
+    if(!fileName.empty()) {
+        thisfd.open(fileName, std::ios::app);
+        thisfd << builder.str() << std::endl;
+        thisfd.close();
+    }
     lock.unlock();
 }
 
@@ -54,6 +62,7 @@ void log::sharedf(std::ostream &ss, const std::string& type) {
         lockf.lock();
         std::cout << type << " (" << prefix << ") [" << getTimestamp() << "]: " << ss.rdbuf() << std::endl;
         lockf.unlock();
+        fd.close();
     } else {
         failedOpenLogFile();
     }

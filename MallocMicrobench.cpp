@@ -2,18 +2,49 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <format>
+#include <cstdio>
 #include <fstream>
 #include <future>
-#include <intrin.h>
 #include <iostream>
 #include <numeric>
 #include <random>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <cstring>
+#include <sstream>
 
+/* Linux build notes
+g++ -O2 -march=native -std=c++20 -DUSE_LEMON=1 MallocMicrobench.cpp \
+  -Icompute_node -Icompute_node/shared \
+  -Lcompute_node/build-release -lremon \
+  -Wl,-rpath,'$ORIGIN/compute_node/build-release' \
+  -o malloc_bench -lpthread -lm 
+
+g++ -O2 -march=native -std=c++20 -DUSE_CRT=1 MallocMicrobench.cpp \
+  -o malloc_bench -lpthread -lm
+
+# jemalloc (if installed)
+g++ -O2 -march=native -std=c++20 -DUSE_JEMALLOC=1 MallocMicrobench.cpp \
+  -o malloc_bench -lpthread -ljemalloc
+
+# mimalloc (if installed)
+g++ -O2 -march=native -std=c++20 -DUSE_MIMALLOC=1 MallocMicrobench.cpp \
+  -o malloc_bench -lpthread -lmimalloc
+
+# dlmalloc (if available in thirdparty/)
+g++ -O2 -march=native -std=c++20 -DUSE_DLMALLOC=1 MallocMicrobench.cpp \
+  -o malloc_bench -lpthread -lm
+*/
+
+
+// Platform-specific RDTSC
+#ifdef _MSC_VER
+#include <intrin.h>
 #pragma intrinsic(__rdtsc)
+#elif defined(__GNUC__) || defined(__clang__)
+#include <x86intrin.h>
+#endif
 
 // Memory allocator selection
 // There are multiple project configurations. Each config should define exactly one target
@@ -46,9 +77,13 @@
 #define USE_TLSF 0
 #endif 
 
+#ifndef USE_LEMON
+#define USE_LEMON 0
+#endif
+
 // Allocator. Pick exactly one.
 static_assert(
-    USE_CRT + USE_DLMALLOC + USE_JEMALLOC + USE_HEAPALLOC + USE_MIMALLOC + USE_RPMALLOC + USE_TLSF == 1, 
+    USE_CRT + USE_DLMALLOC + USE_JEMALLOC + USE_HEAPALLOC + USE_MIMALLOC + USE_RPMALLOC + USE_TLSF + USE_LEMON == 1, 
     "Must pick exactly one allocator");
 
 #if USE_CRT
@@ -57,10 +92,8 @@ static_assert(
 #define USE_DL_PREFIX
 #include "thirdparty/dlmalloc/dlmalloc.h"
 #elif USE_HEAPALLOC
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#undef max
-#undef min
+// HeapAlloc is Windows-only; not supported on Linux
+#error "HeapAlloc allocator is not supported on Linux. Choose another allocator."
 #elif USE_JEMALLOC
 // Requires precompiled dynamic lib
 #include "thirdparty/jemalloc/include/jemalloc.h"
@@ -71,6 +104,8 @@ static_assert(
 #include "thirdparty/rpmalloc/rpmalloc.h"
 #elif USE_TLSF
 #include "thirdparty/tlsf/tlsf.h"
+#elif USE_LEMON
+#include "remon.h"
 #endif
 
 // If 0 then all mallocs/free on single thread
@@ -83,9 +118,9 @@ static_assert(
 #define WRITE_STRATEGY 1
 
 // Config
-constexpr double replaySpeed = 1.0;
-constexpr const char* journalPath = "c:/temp/doom3_journal.txt";
-constexpr const char* resultDir = "c:/temp/";
+constexpr double replaySpeed = 1;
+constexpr const char* journalPath = "/tmp/doom3_journal.txt";
+constexpr const char* resultDir = "/tmp/";
 
 // Typedefs
 using Nanoseconds = std::chrono::nanoseconds;
@@ -111,9 +146,11 @@ struct Allocator {
     static constexpr const char* name = "dlmalloc";
 };
 #elif USE_HEAPALLOC
+// HeapAlloc is Windows-only; not supported on Linux
+#error "HeapAlloc allocator is not supported on Linux"
 struct Allocator {
-    static inline void* alloc(size_t size) { return ::HeapAlloc(GetProcessHeap(), 0, size); }
-    static inline void free(void* ptr) { ::HeapFree(GetProcessHeap(), 0, ptr); }
+    static inline void* alloc(size_t size) { return nullptr; }
+    static inline void free(void* ptr) { }
     static constexpr const char* name = "HeapAlloc";
 };
 #elif USE_JEMALLOC
@@ -142,6 +179,13 @@ struct Allocator {
     static constexpr const char* name = "tlsf";
 };
 tlsf_t Allocator::_tlsf = nullptr;
+#elif USE_LEMON
+struct Allocator {
+    static inline remon_vmm _vmm{};
+    static inline void* alloc(size_t size) { return _vmm.remon_malloc(size); }
+    static inline void free(void* ptr) { _vmm.remon_free(ptr); }
+    static constexpr const char* name = "lemon";
+};
 #else
 #error Could not pick allocator
 #endif
@@ -201,6 +245,10 @@ int main()
     std::unique_ptr<uint8_t[]> pool(new uint8_t[tlsfPoolSize]);
     std::memset(pool.get(), 0, tlsfPoolSize);
     Allocator::_tlsf = tlsf_create_with_pool(pool.get(), tlsfPoolSize);
+#endif
+
+#if USE_HEAPALLOC
+#error "HeapAlloc is Windows-only. Please use a different allocator (jemalloc, mimalloc, rpmalloc, etc.)"
 #endif
 
 #if WRITE_STRATEGY == 0
@@ -374,6 +422,9 @@ int main()
         // Lambda that processes a single entry
         // Assumes entry is ready to be processed.
         const auto processOne = [&](MemoryEntry& entry, size_t entryIdx) {
+            //std::cout << "Processing entry " << entryIdx << " of " << journal.size();
+            //std::cout << " size: " << entry.allocSize << "; ptr: " << std::hex << entry.originalPtr
+            //    << std::dec << std::endl;
             if (entry.op == MemoryOp::Alloc) {
                 auto allocSize = entry.allocSize;
 
@@ -541,7 +592,14 @@ int main()
     // Step 4: Dump Results to File
     // ----------------------------------------------------------------------------------
     {
-        std::string speedStr = replaySpeed <= 0 ? "MaxSpeed" : std::format("{}x", (int)replaySpeed);
+        std::string speedStr;
+        if (replaySpeed <= 0) {
+            speedStr = "MaxSpeed";
+        } else {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%dx", (int)replaySpeed);
+            speedStr = buf;
+        }
 
 #if THREADED_REPLAY
         std::string threadStr = "";
@@ -557,12 +615,14 @@ int main()
         std::string writeStr = "_WriteAll";
 #endif
 
-        std::string filepath = std::format("{}doom3_replayreport_{}_{}{}{}.csv", 
+        char filepath_buf[512];
+        snprintf(filepath_buf, sizeof(filepath_buf), "%sdoom3_replayreport_%s_%s%s%s.csv",
             resultDir,
             Allocator::name,
-            speedStr,
-            threadStr,
-            writeStr);
+            speedStr.c_str(),
+            threadStr.c_str(),
+            writeStr.c_str());
+        std::string filepath = filepath_buf;
         std::cout << "Writing alloc times to: " << filepath << std::endl;
 
         std::ofstream stream(filepath);
@@ -695,18 +755,20 @@ int main()
 // ----------------------------------------------------------------------------------
 std::string formatTime(Nanoseconds ns) {
     auto count = ns.count();
+    char buf[64];
     if (count < 1000) {
-        return std::format("{} nanoseconds", count);
+        snprintf(buf, sizeof(buf), "%lld nanoseconds", (long long)count);
     }
     else if (count < 1000 * 1000) {
-        return std::format("{:.2f} microseconds", (double)count / 1000);
+        snprintf(buf, sizeof(buf), "%.2f microseconds", (double)count / 1000);
     }
     else if (count < 1000 * 1000 * 1000) {
-        return std::format("{:.2f} milliseconds", (double)count / 1000 / 1000);
+        snprintf(buf, sizeof(buf), "%.2f milliseconds", (double)count / 1000 / 1000);
     }
     else {
-        return std::format("{:.2f} seconds", (double)count / 1000 / 1000 / 1000);
+        snprintf(buf, sizeof(buf), "%.2f seconds", (double)count / 1000 / 1000 / 1000);
     }
+    return buf;
 }
 
 std::string formatTime(long long ns) {
@@ -714,18 +776,20 @@ std::string formatTime(long long ns) {
 }
 
 std::string formatBytes(uint64_t bytes) {
+    char buf[64];
     if (bytes < 1024) {
-        return std::format("{} bytes", bytes);
+        snprintf(buf, sizeof(buf), "%llu bytes", (unsigned long long)bytes);
     }
     else if (bytes < 1024 * 1024) {
-        return std::format("{} kilobytes", bytes / 1024);
+        snprintf(buf, sizeof(buf), "%llu kilobytes", (unsigned long long)(bytes / 1024));
     }
-    else  if (bytes < 1024 * 1024 * 1024) {
-        return std::format("{} megabytes", bytes / 1024 / 1024);
+    else if (bytes < 1024 * 1024 * 1024) {
+        snprintf(buf, sizeof(buf), "%llu megabytes", (unsigned long long)(bytes / 1024 / 1024));
     }
     else {
-        return std::format("{:.2f} gigabytes", (double)bytes / 1024 / 1024 / 1024);
+        snprintf(buf, sizeof(buf), "%.2f gigabytes", (double)bytes / 1024 / 1024 / 1024);
     }
+    return buf;
 }
 
 uint64_t RdtscClock::now() { 

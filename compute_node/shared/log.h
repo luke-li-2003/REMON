@@ -36,7 +36,8 @@ public:
         }
     }
 
-    std::string fileName = "";
+    std::string fileName = "./remon.log";
+    std::ofstream thisfd;
 
     std::string getTimestamp();
     std::string getMiliStamp();

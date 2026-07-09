@@ -2,27 +2,34 @@
 
 #include "remon.h"
 
+#define ITERS 4096
+#define ALLOC_SIZE 512*1024
+
 int main (){
 	remon_vmm vmm;
 	void *a = NULL;
 	void *b = NULL;
 
-	printf("allocating A\n");
+	void *ptrs[ITERS];
+
+	for (int i = 0; i < ITERS; i++) {
+		printf("alloc iteration %d\n", i);
+		ptrs[i] = vmm.remon_malloc(ALLOC_SIZE);
+
+		if (i % 900 == 899) {
+			// sleep for a while
+			//sleep(30);
+		}
+	}
+
+	for (int i = 0; i < ITERS; i++) {
+		printf("free iteration %d\n", i);
+		vmm.remon_free(ptrs[i]);
+	}
+
 	a = vmm.remon_malloc(1024);
-	if (!a) {
-		printf("allocation A failed\n");
-		return 1;
-	}
-
-	printf("allocating B\n");
 	b = vmm.remon_malloc(2048);
-	if (!b) {
-		printf("allocation B failed\n");
-		vmm.remon_free(a);
-		return 1;
-	}
 
-	printf("freeing A and B\n");
 	vmm.remon_free(a);
 	vmm.remon_free(b);
 

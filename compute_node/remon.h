@@ -17,6 +17,8 @@
 #include "random"
 #include <algorithm>
 
+#include <chrono>
+
 #include "unistd.h"
 #include <execinfo.h>
 #include <cxxabi.h>
@@ -41,7 +43,7 @@
 #include "BoundedBufferBundle.h"
 #include "SpinLock.h"
 
-
+using Clock = std::chrono::steady_clock;
 using namespace std;
 
 class remon_vmm : public log {
@@ -65,6 +67,8 @@ private:
 
     profiler* runTime;
     SplMux* splMuxObj;
+
+    Clock::time_point _timeBegin;
 
     void activateAddress(void* address);
 

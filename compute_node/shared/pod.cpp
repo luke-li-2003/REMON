@@ -470,12 +470,41 @@ int pod::getFreeBufferSize() {
     return freeBuffer.size();
 }
 
+#include <filesystem>
+#include <iostream>
+
+static stringstream print_fd_count()
+{
+    size_t count = 0;
+    for (auto const& entry : std::filesystem::directory_iterator("/proc/self/fd"))
+        ++count;
+
+    stringstream ss;
+    ss << "FD_INFO FD count = " << count;
+    return ss;
+}
+
+#include <sys/resource.h>
+
+static stringstream print_rlimit()
+{
+    rlimit rl;
+    getrlimit(RLIMIT_NOFILE, &rl);
+
+    stringstream ss;
+    ss  << "FD_INFO lmt soft = " << rl.rlim_cur
+        << ", hard = " << rl.rlim_max;
+    return ss;
+}
+
 void pod::useFd() {
     stringstream ss;
     if(fd == -2) {
         fd = memfd_create("default", 0);
+        //info(ss << "FD_INFO creating fd: " << fd << " i=" << index);
+        //info(ss << print_fd_count().str() << " " << print_rlimit().str());
         if (fd < 0) {
-            err(ss << "failed to create fd i=" << index);
+            err(ss << "FD_INFO failed to create fd i=" << index);
             perror("failed to create fd");
             exit(-1);
         }

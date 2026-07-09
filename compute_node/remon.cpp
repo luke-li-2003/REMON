@@ -1,5 +1,10 @@
 #include "remon.h"
 
+// Return OS thread id (tid)
+static inline unsigned long GetCurrentThreadID() {
+    return (unsigned long) syscall(SYS_gettid);
+}
+
 
 // mutex remon_vmm::seg_lock;
 remon_vmm *remon_vmm::remonSelfPtr;
@@ -18,6 +23,9 @@ profiler activatePodWrapProfiler("activate_pod_wrap");
 
 
 remon_vmm::remon_vmm() : log("remon_vmm " + to_string(getpid())), generator(rd()){
+
+    _timeBegin = Clock::now();
+
     runTime = new profiler("vmm_run_time");
     runTime->record();
 
@@ -1337,10 +1345,23 @@ void remon_vmm::mapForPodI(int i) {
     }
 }
 void* remon_vmm::remon_malloc(size_t size) {
-    return remonMalloc(size);
+    auto ptr = remonMalloc(size);
+    char buf[256];
+    auto timeE = Clock::now() - _timeBegin;
+    sprintf(buf, "MEM_INFO a %lu %p %lu %ld\n", size, ptr,
+            GetCurrentThreadID(), timeE.count());
+    stringstream ss;
+    info(ss << buf);
+    return ptr;
 }
 
 void remon_vmm::remon_free(void* addr) {
     remonFree(addr);
+    char buf[256];
+    auto timeE = Clock::now() - _timeBegin;
+    sprintf(buf, "MEM_INFO f %p %lu %ld\n", addr,
+            GetCurrentThreadID(), timeE.count());
+    stringstream ss;
+    info(ss << buf);
 }
 
