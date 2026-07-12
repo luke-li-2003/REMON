@@ -1344,6 +1344,17 @@ void remon_vmm::mapForPodI(int i) {
         pods[i] = new pod(remonConfig.pageSize, currMemory, i, -2);
     }
 }
+
+static void print_stack(void)
+{
+    void *buffer[1024];
+    int nptrs = backtrace(buffer, 1024);
+
+    backtrace_symbols_fd(buffer, nptrs, fileno(stdout));
+}
+
+static int meminfo_c = 0;
+
 void* remon_vmm::remon_malloc(size_t size) {
     auto ptr = remonMalloc(size);
     char buf[256];
@@ -1352,6 +1363,11 @@ void* remon_vmm::remon_malloc(size_t size) {
             GetCurrentThreadID(), timeE.count());
     stringstream ss;
     info(ss << buf);
+
+    if (size == 33554432 && meminfo_c == 0) {
+        print_stack();
+        meminfo_c = 1;
+    }
     return ptr;
 }
 

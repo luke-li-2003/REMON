@@ -123,6 +123,7 @@ void ColumnDataAllocator::AllocateMemory(idx_t size, uint32_t &block_id, uint32_
 	if (blocks.empty() || blocks.back().Capacity() < size) {
 		AllocateEmptyBlock(size);
 		auto &last_block = blocks.back();
+		printf("MEM_INFO: ColumnData %u %lu bytes\n", last_block.capacity, size);
 		auto allocated = alloc.allocator->Allocate(last_block.capacity);
 		allocated_data.push_back(std::move(allocated));
 	}

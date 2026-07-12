@@ -75,6 +75,7 @@ FileBuffer::MemoryRequirement FileBuffer::CalculateMemory(uint64_t user_size) {
 
 void FileBuffer::Resize(uint64_t new_size) {
 	auto req = CalculateMemory(new_size);
+	printf("MEM_INFO: FileBuffer %lu bytes\n", req.alloc_size);
 	ReallocBuffer(req.alloc_size);
 
 	if (new_size > 0) {

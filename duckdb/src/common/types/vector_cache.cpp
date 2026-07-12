@@ -10,6 +10,8 @@ public:
 	explicit VectorCacheBuffer(Allocator &allocator, const LogicalType &type_p, idx_t capacity_p = STANDARD_VECTOR_SIZE)
 	    : VectorBuffer(VectorBufferType::OPAQUE_BUFFER), type(type_p), capacity(capacity_p) {
 		auto internal_type = type.InternalType();
+		printf("MEM_INFO: VectorCacheBuffer %lu %lu bytes %d\n",
+			capacity * GetTypeIdSize(internal_type), capacity, internal_type);
 		switch (internal_type) {
 		case PhysicalType::LIST: {
 			// memory for the list offsets

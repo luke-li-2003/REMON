@@ -283,6 +283,9 @@ void JoinHashTable::InitializePointerTable() {
 	idx_t capacity = PointerTableCapacity(Count());
 	D_ASSERT(IsPowerOfTwo(capacity));
 
+	printf("MEM_INFO: JointHashTable %lu %lu bytes %d\n",
+	       capacity * sizeof(data_ptr_t), capacity, hash_map.get());
+
 	if (hash_map.get()) {
 		// There is already a hash map
 		auto current_capacity = hash_map.GetSize() / sizeof(data_ptr_t);

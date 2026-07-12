@@ -32,7 +32,7 @@ void log::debug(std::ostream &ss) {
 }
 
 void log::shared(std::ostream &ss, const std::string& type) {
-    return;
+    //return;
     /*
     if(!fileName.empty()) {
         return sharedf(ss, type);

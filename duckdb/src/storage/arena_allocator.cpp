@@ -9,6 +9,7 @@ namespace duckdb {
 //===--------------------------------------------------------------------===//
 ArenaChunk::ArenaChunk(Allocator &allocator, idx_t size) : current_position(0), maximum_size(size), prev(nullptr) {
 	D_ASSERT(size > 0);
+	printf("MEM_INFO: ArenaChunk %llu bytes\n", size);
 	data = allocator.Allocate(size);
 }
 ArenaChunk::~ArenaChunk() {
