@@ -1,0 +1,5 @@
+Figure out the source of the small allocs
+
+Do a bit more research on the bkgd of different allocators - read the response by ChatGPT
+
+Some way of separating the different queries in the plot - by vibes?

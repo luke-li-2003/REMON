@@ -1364,7 +1364,7 @@ void* remon_vmm::remon_malloc(size_t size) {
     stringstream ss;
     info(ss << buf);
 
-    if (size == 33554432 && meminfo_c == 0) {
+    if (size == 160 && meminfo_c == 0) {
         print_stack();
         meminfo_c = 1;
     }
@@ -1378,6 +1378,6 @@ void remon_vmm::remon_free(void* addr) {
     sprintf(buf, "MEM_INFO f %p %lu %ld\n", addr,
             GetCurrentThreadID(), timeE.count());
     stringstream ss;
-    info(ss << buf);
+    //info(ss << buf);
 }
 

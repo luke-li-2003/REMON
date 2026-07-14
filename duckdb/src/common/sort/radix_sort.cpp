@@ -38,6 +38,8 @@ static void SortTiedBlobs(BufferManager &buffer_manager, const data_ptr_t datapt
 		          return order * Comparators::CompareVal(left_ptr, right_ptr, logical_type) < 0;
 	          });
 	// Re-order
+	printf("MEM_INFO: RadixSort %lu %lu %lu bytes\n",
+		(end - start) * sort_layout.entry_size, end - start, sort_layout.entry_size);
 	auto temp_block = buffer_manager.GetBufferAllocator().Allocate((end - start) * sort_layout.entry_size);
 	data_ptr_t temp_ptr = temp_block.get();
 	for (idx_t i = 0; i < end - start; i++) {
@@ -65,8 +67,11 @@ static void SortTiedBlobs(BufferManager &buffer_manager, SortedBlock &sb, bool *
                           const idx_t &count, const idx_t &tie_col, const SortLayout &sort_layout) {
 	D_ASSERT(!ties[count - 1]);
 	auto &blob_block = *sb.blob_sorting_data->data_blocks.back();
+	printf("STB 1\n");
 	auto blob_handle = buffer_manager.Pin(blob_block.block);
+	printf("STB 2\n");
 	const data_ptr_t blob_ptr = blob_handle.Ptr();
+	printf("STB 3\n");
 
 	for (idx_t i = 0; i < count; i++) {
 		if (!ties[i]) {
@@ -322,19 +327,24 @@ void LocalSortState::SortInMemory() {
 			break;
 		}
 
+		printf("SIM 1\n");
 		ComputeTies(dataptr, count, col_offset, sorting_size, ties, *sort_layout);
+		printf("SIM 2\n");
 		if (!AnyTies(ties, count)) {
 			// No ties, stop sorting
 			break;
 		}
+		printf("SIM 3\n");
 
 		if (!sort_layout->constant_size[i]) {
 			SortTiedBlobs(*buffer_manager, sb, ties, dataptr, count, i, *sort_layout);
+			printf("SIM 4\n");
 			if (!AnyTies(ties, count)) {
 				// No more ties after tie-breaking, stop
 				break;
 			}
 		}
+		printf("SIM 5\n");
 
 		col_offset += sorting_size;
 		sorting_size = 0;

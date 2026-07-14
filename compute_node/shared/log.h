@@ -36,7 +36,7 @@ public:
         }
     }
 
-    std::string fileName = "./remon.log";
+    std::string fileName = "";//"./remon.log";
     std::ofstream thisfd;
 
     std::string getTimestamp();
