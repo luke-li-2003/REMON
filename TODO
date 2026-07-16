@@ -1,5 +1,3 @@
-Figure out the source of the small allocs
+Do a TPC-H speed test on REMON with no printouts
 
-Do a bit more research on the bkgd of different allocators - read the response by ChatGPT
-
-Some way of separating the different queries in the plot - by vibes?
+Figure out the 1GB query

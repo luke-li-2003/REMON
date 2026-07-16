@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			stream_stats ss = streamTPCH(con, dataDir, queryDir, rounds, false, queryList);
+			stream_stats ss = streamTPCH(con, dataDir, queryDir, rounds, true, queryList);
 			std::string logDirPath = "./results/" + logDir + "/";
 			createDirectory(logDirPath);
 
@@ -399,6 +399,7 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 		int queryIdx = queryList.empty() ? i % 22 : queryList[i % queryCount] - 1;
 
 		auto start = std::chrono::high_resolution_clock::now();
+		std::cout << queries[queryIdx] << std::endl;
 		auto result = con.Query(queries[queryIdx]);
 		if (!result || result->HasError()) {
 			throw std::runtime_error("Query execution failed: " + (result ? result->GetError() : "null result"));
@@ -408,6 +409,7 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 		if (verbose) {
 			result->Print();
 		}
+		std::cout << "\nSQL_OUT:" << result->ToString() << std::endl;
 
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		if (duration.count() == 0) {
@@ -473,9 +475,9 @@ std::vector<double> individualTPCH(Connection &con, std::string dataDir, std::st
 			std::cerr << "Warning: query templates detected; substituting default parameter values." << std::endl;
 			warned_templates = true;
 		}
-#ifdef DEBUG
+//#ifdef DEBUG
 		std::cout << queries << std::endl;
-#endif
+//#endif
 		auto start = std::chrono::high_resolution_clock::now();
 		auto result = con.Query(queries);
 		if (!result || result->HasError()) {

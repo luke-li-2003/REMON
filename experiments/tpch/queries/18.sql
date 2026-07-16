@@ -2,6 +2,10 @@
 -- TPC-H/TPC-R Large Volume Customer Query (Q18)
 -- Function Query Definition
 -- Approved February 1998
+PRAGMA explain_output='all';
+
+explain
+analyze
 :x
 :o
 select
