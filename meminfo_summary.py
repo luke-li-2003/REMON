@@ -37,6 +37,9 @@ NON_ALLOCATOR_TOKENS = {
     "Trace",
     "Warn",
     "Warning",
+    "Query",
+    "SIM",
+    "STB"
 }
 
 
@@ -57,15 +60,15 @@ def parse_allocator_printout(line: str) -> tuple[str, int] | None:
     if not body:
         return None
 
-    match = ALLOCATOR_LINE_RE.match(body)
-    if not match:
+    m = ALLOCATOR_LINE_RE.match(body)
+    if not m:
         return None
 
-    allocator = match.group("allocator")
+    allocator = m.group("allocator")
     if allocator in NON_ALLOCATOR_TOKENS:
         return None
 
-    return allocator, int(match.group("size"))
+    return allocator, int(m.group("size"))
 
 
 def count_meminfo(
