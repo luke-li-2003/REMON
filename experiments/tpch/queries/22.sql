@@ -1,9 +1,7 @@
--- $ID$
--- TPC-H/TPC-R Global Sales Opportunity Query (Q22)
--- Functional Query Definition
--- Approved February 1998
-:x
-:o
+-- using 42 as a seed to the RNG
+--#SET ROWS_FETCH -1
+
+
 select
 	cntrycode,
 	count(*) as numcust,
@@ -17,7 +15,7 @@ from
 			customer
 		where
 			substring(c_phone from 1 for 2) in
-				(':1', ':2', ':3', ':4', ':5', ':6', ':7')
+				('28', '12', '24', '15', '32', '11', '13')
 			and c_acctbal > (
 				select
 					avg(c_acctbal)
@@ -26,7 +24,7 @@ from
 				where
 					c_acctbal > 0.00
 					and substring(c_phone from 1 for 2) in
-						(':1', ':2', ':3', ':4', ':5', ':6', ':7')
+						('28', '12', '24', '15', '32', '11', '13')
 			)
 			and not exists (
 				select
@@ -41,4 +39,3 @@ group by
 	cntrycode
 order by
 	cntrycode;
-:n -1

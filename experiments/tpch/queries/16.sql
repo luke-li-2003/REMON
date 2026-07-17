@@ -1,9 +1,7 @@
--- $ID$
--- TPC-H/TPC-R Parts/Supplier Relationship Query (Q16)
--- Functional Query Definition
--- Approved February 1998
-:x
-:o
+-- using 42 as a seed to the RNG
+--#SET ROWS_FETCH -1
+
+
 select
 	p_brand,
 	p_type,
@@ -14,9 +12,9 @@ from
 	part
 where
 	p_partkey = ps_partkey
-	and p_brand <> ':1'
-	and p_type not like ':2%'
-	and p_size in (:3, :4, :5, :6, :7, :8, :9, :10)
+	and p_brand <> 'Brand#12'
+	and p_type not like 'STANDARD POLISHED%'
+	and p_size in (41, 28, 43, 38, 8, 30, 12, 45)
 	and ps_suppkey not in (
 		select
 			s_suppkey
@@ -34,4 +32,3 @@ order by
 	p_brand,
 	p_type,
 	p_size;
-:n -1

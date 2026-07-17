@@ -1,13 +1,7 @@
--- $ID$
--- TPC-H/TPC-R Large Volume Customer Query (Q18)
--- Function Query Definition
--- Approved February 1998
-PRAGMA explain_output='all';
+-- using 42 as a seed to the RNG
+--#SET ROWS_FETCH 100
 
-explain
-analyze
-:x
-:o
+
 select
 	c_name,
 	c_custkey,
@@ -27,7 +21,7 @@ where
 			lineitem
 		group by
 			l_orderkey having
-				sum(l_quantity) > :1
+				sum(l_quantity) > 312
 	)
 	and c_custkey = o_custkey
 	and o_orderkey = l_orderkey
@@ -40,4 +34,3 @@ group by
 order by
 	o_totalprice desc,
 	o_orderdate;
-:n 100

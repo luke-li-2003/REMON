@@ -1364,7 +1364,7 @@ void* remon_vmm::remon_malloc(size_t size) {
     stringstream ss;
     info(ss << buf);
 
-    if (size == 160 && meminfo_c == 0) {
+    if (size == 2097096 && meminfo_c == 0) {
         print_stack();
         meminfo_c = 1;
     }

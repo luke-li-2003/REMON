@@ -1,10 +1,7 @@
--- $ID$
--- TPC-H/TPC-R Pricing Summary Report Query (Q1)
--- Functional Query Definition
--- Approved February 1998
-EXPLAIN
-:x
-:o
+-- using 42 as a seed to the RNG
+--#SET ROWS_FETCH -1
+
+
 select
 	l_returnflag,
 	l_linestatus,
@@ -19,11 +16,10 @@ select
 from
 	lineitem
 where
-	l_shipdate <= date '1998-12-01' - interval ':1' day
+	l_shipdate <= date '1998-12-01' - interval '91' day
 group by
 	l_returnflag,
 	l_linestatus
 order by
 	l_returnflag,
 	l_linestatus;
-:n -1

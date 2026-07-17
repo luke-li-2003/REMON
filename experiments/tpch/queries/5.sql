@@ -1,9 +1,7 @@
--- $ID$
--- TPC-H/TPC-R Local Supplier Volume Query (Q5)
--- Functional Query Definition
--- Approved February 1998
-:x
-:o
+-- using 42 as a seed to the RNG
+--#SET ROWS_FETCH -1
+
+
 select
 	n_name,
 	sum(l_extendedprice * (1 - l_discount)) as revenue
@@ -21,11 +19,10 @@ where
 	and c_nationkey = s_nationkey
 	and s_nationkey = n_nationkey
 	and n_regionkey = r_regionkey
-	and r_name = ':1'
-	and o_orderdate >= date ':2'
-	and o_orderdate < date ':2' + interval '1' year
+	and r_name = 'AFRICA'
+	and o_orderdate >= date '1997-01-01'
+	and o_orderdate < date '1997-01-01' + interval '1' year
 group by
 	n_name
 order by
 	revenue desc;
-:n -1

@@ -15,6 +15,10 @@
 
 // #define DEBUG
 
+//#define EXPANAL
+//#define EA_PREFIX "PRAGMA explain_output='all';\nexplain analyze\n"
+//#define EA_PREFIX "PRAGMA enable_profiling='json';\nPRAGMA profiling_output='/tmp/profile.json';\n"
+
 // NOTE: if file has multiple select queries, it seems result->Print() only prints the result from first query
 
 using namespace duckdb;
@@ -119,7 +123,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			stream_stats ss = streamTPCH(con, dataDir, queryDir, rounds, true, queryList);
+			stream_stats ss = streamTPCH(con, dataDir, queryDir, rounds, false, queryList);
 			std::string logDirPath = "./results/" + logDir + "/";
 			createDirectory(logDirPath);
 
@@ -229,12 +233,14 @@ std::string generateTimeStamp() {
 std::string readFile(const std::string& path) {
 	std::ifstream fileToRead(path);
 	if (!fileToRead) {
+		std::cout << "Error: Could not open file " << path << " for reading." << std::endl;
 		throw std::runtime_error("Could not open file: " + path);
 	}
 	std::stringstream buf;
 	buf << fileToRead.rdbuf();
 	std::string contents = buf.str();
 	if (contents.empty()) {
+		std::cout << "Error: File is empty: " << path << std::endl;
 		throw std::runtime_error("File is empty: " + path);
 	}
 	return contents;
@@ -383,8 +389,9 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 	std::cout << "\n>>> LOAD QUERIES... \n" << std::endl;
 	for (int i = 1; i <= 22; ++i) {
 		query = readFile(queryDir + std::to_string(i) + ".sql");
+		std::cout << "Query " << i << " loaded." << std::endl;
 		bool modified = false;
-		query = preprocessTpchQuery(query, &modified);
+		//query = preprocessTpchQuery(query, &modified);
 		if (modified && !warned_templates) {
 			std::cerr << "Warning: query templates detected; substituting default parameter values." << std::endl;
 			warned_templates = true;
@@ -399,9 +406,16 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 		int queryIdx = queryList.empty() ? i % 22 : queryList[i % queryCount] - 1;
 
 		auto start = std::chrono::high_resolution_clock::now();
+
+#ifdef EXPANAL	
+		std::string eapfx(EA_PREFIX);
+		queries[queryIdx] = eapfx + queries[queryIdx];
 		std::cout << queries[queryIdx] << std::endl;
+#endif
+
 		auto result = con.Query(queries[queryIdx]);
 		if (!result || result->HasError()) {
+			std::cout << "ERR_OUT:\n" << result->ToString() << std::endl;
 			throw std::runtime_error("Query execution failed: " + (result ? result->GetError() : "null result"));
 		}
 		auto end = std::chrono::high_resolution_clock::now();
@@ -409,7 +423,6 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 		if (verbose) {
 			result->Print();
 		}
-		std::cout << "\nSQL_OUT:" << result->ToString() << std::endl;
 
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		if (duration.count() == 0) {
@@ -422,6 +435,9 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 		totalQueries++;
 		totalTime += duration.count() / 1000.0;
 		latencies.push_back(std::pair<int, double>{queryIdx + 1, duration.count()});
+#ifdef EXPANAL	
+		std::cout << "SQL_OUT:\n" << result->ToString() << std::endl;
+#endif
 	}
 
 	stream_stats res;

@@ -1,3 +1,27 @@
-Do a TPC-H speed test on REMON with no printouts
+EBPF?
+
+Query plan?
+
+Latest version of DuckDB?
 
 Figure out the 1GB query
+
+ChatGPT-Fu: why is nothing consistent? Find the json profile in the main repo folder
+
+```
+I just noticed that since I used `PRAGMA enable_profiling='json';` to generate the tree this time instead of `explain analyze`, the ColumnData allocators are back.
+
+
+
+When I was using the `explain analyze`, the RESULT_COLLECTOR actually uses zero seconds:
+
+
+
+RESULT_COLLECTOR (0.00)
+
+  EXPLAIN_ANALYZE (0.00)
+
+    ORDER_BY(0.22)
+
+...
+```

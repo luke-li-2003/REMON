@@ -165,7 +165,7 @@ for iteration, ts in query_starts:
 
 plt.xlabel("Time elapsed (s)")
 plt.ylabel("Allocation size (bytes)")
-plt.xlim(0, 275)
+#plt.xlim(115, 140)
 #plt.ylim(64, 2**26)
 plt.title("DuckDB Memory Allocations")
 plt.grid(True, which="major", alpha=0.3)
