@@ -66,12 +66,14 @@ with open(args.logfile, "r", errors="ignore") as f:
                 allocator = pending_class["class"]
 
                 # Optional sanity check
+                '''
                 if pending_class["size"] != size:
                     print(
                         f"Warning: class size {pending_class['size']} "
                         f"!= raw size {size}"
                     )
                     print(line)
+                '''
             else:
                 allocator = "unknown"
 
@@ -121,6 +123,14 @@ ticks = [2**e for e in range(min_exp, max_exp + 1)]
 
 ax = plt.gca()
 ax.set_yticks(ticks)
+
+# set axis depending on time elapsed
+if (allocations[-1][0] > 20):
+    majorX = 25
+    minorX = 5
+else:
+    majorX = 5
+    minorX = 1
 
 ax.xaxis.set_major_locator(MultipleLocator(25))
 ax.xaxis.set_minor_locator(MultipleLocator(5))
