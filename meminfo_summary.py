@@ -51,6 +51,7 @@ def allocator_body(line: str) -> str | None:
     if MEM_INFO_PREFIX in line:
         return line.split(MEM_INFO_PREFIX, 1)[1].strip()
 
+    return None
     # Also support cleaned logs that contain only the allocator printout body.
     return line.strip()
 

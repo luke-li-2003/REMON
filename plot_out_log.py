@@ -1,188 +1,186 @@
 #!/usr/bin/env python3
 
-import re
 import argparse
-import sys
-from collections import defaultdict
 import math
+import re
+from collections import defaultdict, deque
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from matplotlib.ticker import MultipleLocator
 
-# Matches lines like:
-# MEM_INFO: ArenaChunk 4096 bytes
-# MEM_INFO: VectorCacheBuffer 2048 2048 bytes 1
+
+# Example:
 # MEM_INFO: ColumnData 4096 2304 bytes
-class_pattern = re.compile(
-    r"^MEM_INFO:\s+([A-Za-z0-9_]+)\s+(\d+)"
+CLASS_RE = re.compile(
+    r"MEM_INFO:\s+([A-Za-z_][A-Za-z0-9_]*)\s+(\d+).*bytes"
 )
 
-# Matches lines like:
+# Example:
 # Info (...) : MEM_INFO a 4096 0x... pid timestamp
-raw_alloc_pattern = re.compile(
-    r"MEM_INFO a\s+(\d+)\s+0x[0-9a-fA-F]+\s+\d+\s+(\d+)"
+RAW_ALLOC_RE = re.compile(
+    r"MEM_INFO\s+a\s+(\d+)\s+0x[0-9a-fA-F]+\s+\d+\s+(\d+)"
 )
 
-query_pattern = re.compile(r">>> RUN ITERATION (\d+)")
+ITER_RE = re.compile(r">>> RUN ITERATION (\d+)")
+iterations = []
 
-query_starts = []
 
-pending_class = None
+def parse_log(filename):
+    """
+    Returns a list of
+        (time_ns, size, allocator_name)
+    """
 
-allocations = []
+    pending = defaultdict(deque)
+    allocations = []
 
-parser = argparse.ArgumentParser()
-parser.add_argument("logfile")
-parser.add_argument("outfile", nargs='?', default=None)
-args = parser.parse_args()
+    with open(filename, "r", errors="ignore") as f:
+        current_iteration = None
+        for line in f:
 
-with open(args.logfile, "r", errors="ignore") as f:
-    for line in f:
+            # --------- iterations ----------------
+            m = ITER_RE.search(line)
+            if m:
+                current_iteration = int(m.group(1))
+                iterations.append((current_iteration, None))   # timestamp to be filled later
+                continue
 
-        # match the iteration line
-        m = query_pattern.match(line)
-        if m:
-            iteration = int(m.group(1))
-            query_starts.append((iteration, None))
-            continue
+            # ---------- class allocator ----------
+            m = CLASS_RE.search(line)
+            if m:
+                allocator = m.group(1)
+                size = int(m.group(2))
+                pending[size].append(allocator)
+                continue
 
-        # Remember the most recent class allocator
-        m = class_pattern.match(line)
-        if m:
-            pending_class = {
-                "class": m.group(1),
-                "size": int(m.group(2)),
-            }
-            continue
+            # ---------- raw allocation ----------
+            m = RAW_ALLOC_RE.search(line)
+            if m:
+                size = int(m.group(1))
+                timestamp = int(m.group(2))
 
-        # Look for raw allocation
-        m = raw_alloc_pattern.search(line)
-        if m:
-            size = int(m.group(1))
-            timestamp = int(m.group(2))
+                if pending[size]:
+                    allocator = pending[size].popleft()
+                else:
+                    allocator = "Unknown"
 
-            if pending_class is not None:
-                allocator = pending_class["class"]
+                allocations.append((timestamp, size, allocator))
 
-                # Optional sanity check
-                '''
-                if pending_class["size"] != size:
-                    print(
-                        f"Warning: class size {pending_class['size']} "
-                        f"!= raw size {size}"
-                    )
-                    print(line)
-                '''
-            else:
-                allocator = "unknown"
+                # Record timestamp for the most recent iteration marker
+                if iterations and iterations[-1][1] is None:
+                    iterations[-1] = (iterations[-1][0], timestamp)
 
-            allocations.append((timestamp, size, allocator))
+    return allocations
 
-            # Consume the pending class
-            pending_class = None
 
-            # update the start of the query
-            if query_starts and query_starts[-1][1] is None:
-                query_starts[-1] = (query_starts[-1][0], timestamp)
-
-# ---------------- Plot ----------------
-
-if not allocations:
-    raise RuntimeError("No allocations found.")
-
-t0 = 0#allocations[0][0]
-
-by_allocator = defaultdict(lambda: ([], []))
-
-for ts, size, allocator in allocations:
-    x = (ts - t0) / 1e9  # ns -> seconds
-    by_allocator[allocator][0].append(x)
-    by_allocator[allocator][1].append(size)
-
-plt.figure(figsize=(20, 5))
-
-for allocator, (xs, ys) in sorted(by_allocator.items()):
-    if allocator == "unknown":
-        plt.scatter(xs, ys, s=4, alpha=0.05, label=allocator)
-    else:
-        plt.scatter(xs, ys, s=8, alpha=0.5, label=allocator)
-
-# ----- Log2 y-axis -----
-
-plt.yscale("log", base=2)
-
-# Determine range of powers of 2 to display
-min_size = min(size for _, size, _ in allocations)
-max_size = max(size for _, size, _ in allocations)
-
-min_exp = int(math.floor(math.log2(min_size)))
-max_exp = int(math.ceil(math.log2(max_size)))
-
-ticks = [2**e for e in range(min_exp, max_exp + 1)]
-
-ax = plt.gca()
-ax.set_yticks(ticks)
-
-# set axis depending on time elapsed
-if (allocations[-1][0] > 20):
-    majorX = 25
-    minorX = 5
-else:
-    majorX = 5
-    minorX = 1
-
-ax.xaxis.set_major_locator(MultipleLocator(25))
-ax.xaxis.set_minor_locator(MultipleLocator(5))
-
-ax.grid(True, which="major", axis="x", alpha=0.5)
-ax.grid(True, which="minor", axis="x", alpha=0.2)
-
-# Label as powers of two
-ax.set_yticklabels([2**e for e in range(min_exp, max_exp + 1)])
-
-# Optional: disable minor ticks
-ax.yaxis.set_minor_locator(mticker.NullLocator())
-
-# make the query lines
-ax = plt.gca()
-
-ymax = ax.get_ylim()[1]
-
-for iteration, ts in query_starts:
-    if ts is None:
-        continue
-
-    x = (ts - t0) / 1e9
-
-    ax.axvline(
-        x,
-        color="black",
-        linestyle="--",
-        linewidth=0.8,
-        alpha=0.5,
+def main():
+    parser = argparse.ArgumentParser(
+        description="Plot DuckDB allocation timeline."
     )
 
-    ax.text(
-        x,
-        ymax,
-        f"Q{iteration+1}",
-        rotation=90,
-        va="bottom",
-        ha="center",
+    parser.add_argument(
+        "logfile",
+        help="Input allocation log"
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Export figure instead of displaying it"
+    )
+
+    args = parser.parse_args()
+
+    allocs = parse_log(args.logfile)
+
+    if not allocs:
+        print("No allocations found.")
+        return
+
+    t0 = 0#min(a[0] for a in allocs)
+
+    xs = [(a[0] - t0) / 1e9 for a in allocs]
+    ys = [a[1] for a in allocs]
+    names = [a[2] for a in allocs]
+
+    unique = sorted(set(names))
+
+    cmap = plt.get_cmap("tab20")
+
+    fig, ax = plt.subplots(figsize=(14, 8))
+
+    for i, name in enumerate(unique):
+        idx = [j for j, n in enumerate(names) if n == name]
+
+        ax.scatter(
+            [xs[j] for j in idx],
+            [ys[j] for j in idx],
+            s=8,
+            alpha=0.5,
+            label=name
+        )
+
+    # rulers
+    iteration_times = [
+        (idx, (ts - t0) / 1e9)
+        for idx, ts in iterations
+        if ts is not None
+    ]
+    for idx, t in iteration_times:
+        ax.axvline(
+            x=t,
+            color="black",
+            linestyle="--",
+            linewidth=0.8,
+            alpha=0.5,
+        )
+    
+        ax.text(
+            t,
+            1.01,
+            f"Iter {idx}",
+            rotation=90,
+            transform=ax.get_xaxis_transform(),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    # ----- x axis -----
+    ax.set_xlim(0, 20)
+    ax.set_xlabel("Elapsed Time (s)")
+
+    # ----- y axis -----
+    ax.set_yscale("log", base=2)
+
+    min_size = min(ys)
+    max_size = max(ys)
+
+    low = int(math.floor(math.log2(min_size)))
+    high = int(math.ceil(math.log2(max_size)))
+
+    ticks = [2 ** i for i in range(low, high + 1)]
+
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([f"$2^{{{i}}}$" for i in range(low, high + 1)])
+
+    ax.set_ylabel("Allocation Size (bytes)")
+
+    ax.grid(True, which="both", alpha=0.3)
+
+    ax.legend(
         fontsize=8,
+        markerscale=2,
+        bbox_to_anchor=(1.02, 1),
+        loc="upper left",
     )
 
-plt.xlabel("Time elapsed (s)")
-plt.ylabel("Allocation size (bytes)")
-#plt.xlim(115, 140)
-#plt.ylim(64, 2**26)
-plt.title("DuckDB Memory Allocations")
-plt.grid(True, which="major", alpha=0.3)
+    plt.tight_layout()
 
-plt.legend(markerscale=2, fontsize=8)
-#plt.tight_layout()
-if args.outfile:
-	plt.savefig(args.outfile, dpi=400)
-plt.show()
+    if args.output:
+        plt.savefig(args.output, dpi=300)
+    else:
+        plt.show()
 
+
+if __name__ == "__main__":
+    main()

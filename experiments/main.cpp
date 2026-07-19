@@ -18,6 +18,12 @@
 //#define EXPANAL
 //#define EA_PREFIX "PRAGMA explain_output='all';\nexplain analyze\n"
 //#define EA_PREFIX "PRAGMA enable_profiling='json';\nPRAGMA profiling_output='/tmp/profile.json';\n"
+//#define EA_PREFIX "PRAGMA memory_limit='8GB';\n"
+
+// set to zero to not restrict the memory
+#define MEMRES 2 
+
+//#define INITLOAD
 
 // NOTE: if file has multiple select queries, it seems result->Print() only prints the result from first query
 
@@ -45,7 +51,7 @@ int main(int argc, char *argv[]) {
 	}
 	std::string experiment = argv[1];
 
-	DuckDB db(nullptr);
+	DuckDB db("tpch.db");
 	Connection con(db);
 
 	try {
@@ -372,6 +378,7 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 
 	std::cout << "\n>>> BEGIN TPC-H Stream Test:\n" << std::endl;
 
+#ifdef INITLOAD
 	std::cout << "\n>>> INIT SCHEMA... \n" << std::endl;
 	query = readFile(dataDir + "schema.sql");
 	auto result = con.Query(query);
@@ -385,6 +392,7 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 	if (!result || result->HasError()) {
 		throw std::runtime_error("Data load failed: " + (result ? result->GetError() : "null result"));
 	}
+#endif
 
 	std::cout << "\n>>> LOAD QUERIES... \n" << std::endl;
 	for (int i = 1; i <= 22; ++i) {
@@ -397,6 +405,16 @@ stream_stats streamTPCH(Connection &con, std::string dataDir, std::string queryD
 			warned_templates = true;
 		}
 		queries.push_back(query);
+	}
+
+	if (MEMRES > 0) {
+		std::cout << ">>> SET MEMORY LIMIT... \n" << std::endl;
+		query = "SET memory_limit='" + std::to_string(MEMRES) + "GB';";
+		std::cout << query << std::endl;
+		auto result = con.Query(query);
+		if (!result || result->HasError()) {
+			throw std::runtime_error("Set mem failed: " + (result ? result->GetError() : "null result"));
+		}
 	}
 
 	int queryCount = queryList.empty() ? 22 : queryList.size();

@@ -1357,6 +1357,7 @@ static int meminfo_c = 0;
 
 void* remon_vmm::remon_malloc(size_t size) {
     auto ptr = remonMalloc(size);
+    //auto ptr = ::malloc(size);
     char buf[256];
     auto timeE = Clock::now() - _timeBegin;
     sprintf(buf, "MEM_INFO a %lu %p %lu %ld\n", size, ptr,
@@ -1364,14 +1365,14 @@ void* remon_vmm::remon_malloc(size_t size) {
     stringstream ss;
     info(ss << buf);
 
-    if (size == 2097096 && meminfo_c == 0) {
+    if ((size == 688128 || size == 1052672) && meminfo_c == 0) {
         print_stack();
-        meminfo_c = 1;
     }
     return ptr;
 }
 
 void remon_vmm::remon_free(void* addr) {
+    //::free(addr);return;
     remonFree(addr);
     char buf[256];
     auto timeE = Clock::now() - _timeBegin;
